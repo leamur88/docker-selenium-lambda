@@ -12,7 +12,8 @@ RUN dnf install -y atk cups-libs gtk3 libXcomposite alsa-lib \
     xorg-x11-xauth dbus-glib dbus-glib-devel nss mesa-libgbm
 COPY requirements.txt /tmp/
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
+RUN pip install setuptools
 COPY --from=build /opt/chrome-linux64 /opt/chrome
 COPY --from=build /opt/chromedriver-linux64 /opt/
-COPY main.py ./
-CMD [ "main.handler" ]
+COPY lifetime.py ./
+CMD [ "lifetime.handler" ]
