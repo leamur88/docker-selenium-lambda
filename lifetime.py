@@ -1,17 +1,21 @@
-import time
+import time, random
 import requests
 from datetime import datetime, timedelta, timezone
-import os
+import sys, os
+sys.path.append(os.getcwd())
+
 
 from seleniumwire import webdriver
 from selenium.webdriver.chrome.service import Service
 from tempfile import mkdtemp
 from selenium.webdriver.common.by import By
 
-court1 = "ZXhlcnA6MTc1YnI0NDAxOjcwMTU5MTE0MTUwOA=="
-court2 = "ZXhlcnA6MTc1YnI0NjAxOjcwMTU5MTE0MTUwOA=="
-court3 = "ZXhlcnA6MTc1YnI0NDAyOjcwMTU5MTE0MTUwOA=="
-court4 = "ZXhlcnA6MTc1YnI0ODAxOjcwMTU5MTE0MTUwOA=="
+courts = {
+    1: "ZXhlcnA6MTc1YnI0NDAxOjcwMTU5MTE0MTUwOA==",
+    2: "ZXhlcnA6MTc1YnI0NjAxOjcwMTU5MTE0MTUwOA==",
+    3: "ZXhlcnA6MTc1YnI0NDAyOjcwMTU5MTE0MTUwOA==",
+    4: "ZXhlcnA6MTc1YnI0ODAxOjcwMTU5MTE0MTUwOA=="
+}
 
 options = webdriver.ChromeOptions()
 service = Service("/opt/chromedriver")
@@ -31,13 +35,19 @@ options.add_argument(f"--disk-cache-dir={mkdtemp()}")
 options.add_argument("--remote-debugging-port=9222")
 
 driver = webdriver.Chrome(options=options, service=service)
+# driver = webdriver.Chrome(options=options)
 
 
-def createDateTimeString(yr, m, d, h, min):
-    dt_obj = datetime(yr, m, d, h, min, 0)
+
+def createDateTimeString(h, min, m, d):
+    if m is None or d is None:
+        desiredDate = datetime.today() + timedelta(days=7)
+        desiredDate = desiredDate.replace(hour=h, minute=min, second=0)
+    else:
+        desiredDate = datetime(2024, m, d, h, min, 0)
     timezone_offset = timedelta(hours=-5)  # Assuming -05:00 offset
     tz = timezone(timezone_offset)
-    dt_with_offset = dt_obj.replace(tzinfo=tz)
+    dt_with_offset = desiredDate.replace(tzinfo=tz)
     iso_format_str = dt_with_offset.strftime("%Y-%m-%dT%H:%M:%S%z")
     iso_format_str = iso_format_str[:-2] + ":00"
     return iso_format_str
@@ -45,8 +55,6 @@ def createDateTimeString(yr, m, d, h, min):
 
 def makeInitialReservation(startTime, headers, duration, court):
     url = "https://api.lifetimefitness.com/sys/registrations/V3/ux/resource"
-    print(startTime)
-    print(court3)
     # Parameters for the request body
     body_params = {
         "duration": f"{str(duration)}",
@@ -124,7 +132,20 @@ def getHeaders():
 
 
 def handler(event=None, context=None):
-    startTime = createDateTimeString(2024, 5, 8, 6, 0)
+    startTime = createDateTimeString(event.get('hr'), event.get('min'), event.get('month'), event.get('day'))
+    print(startTime)
     headers = getHeaders()
-    regId = makeInitialReservation(startTime, headers, 30, court4)
+    regId = makeInitialReservation(startTime, headers, event.get('duration'),
+                                   courts.get(event.get('court'), random.choice(list(courts.values()))))
     confirmReservation(regId, headers)
+
+
+# if __name__ == '__main__':
+#     event = {
+#         'hr': 8,
+#         'min': 30,
+#         'duration': 90,
+#         'month': 5,
+#         'day': 13
+#     }
+#     handler(event)
