@@ -14,6 +14,9 @@ This image goes with these versions. [These are automatically updated and tested
 
 ## Running the demo
 
+docker buildx build --platform linux/amd64 -t 962145567907.dkr.ecr.us-east-2.amazonaws.com/lifetime:dynamic .
+docker push 962145567907.dkr.ecr.us-east-2.amazonaws.com/lifetime:dynamic 
+
 ```bash
 $ npm install -g serverless # skip this line if you have already installed Serverless Framework
 $ export AWS_REGION=ap-northeast-1 # You can specify region or skip this line. us-east-1 will be used by default.

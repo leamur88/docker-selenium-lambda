@@ -35,13 +35,13 @@ options.add_argument(f"--disk-cache-dir={mkdtemp()}")
 options.add_argument("--remote-debugging-port=9222")
 
 driver = webdriver.Chrome(options=options, service=service)
-# driver = webdriver.Chrome(options=options)
+#driver = webdriver.Chrome(options=options)
 
 
 
 def createDateTimeString(h, min, m, d):
     if m is None or d is None:
-        desiredDate = datetime.today() + timedelta(days=7)
+        desiredDate = datetime.today() + timedelta(days=8)
         desiredDate = desiredDate.replace(hour=h, minute=min, second=0)
     else:
         desiredDate = datetime(2024, m, d, h, min, 0)
@@ -54,30 +54,36 @@ def createDateTimeString(h, min, m, d):
 
 
 def makeInitialReservation(startTime, headers, duration, court):
+    if court is None:
+        court = random.choice(list(courts.values()))
+
     url = "https://api.lifetimefitness.com/sys/registrations/V3/ux/resource"
-    # Parameters for the request body
-    body_params = {
-        "duration": f"{str(duration)}",
-        "resourceId": court,
-        "service": None,
-        "start": startTime
-    }
+    court_choices = list(courts.values())
 
-    try:
-        response = requests.post(url, json=body_params, headers=headers)
-        # Check if the request was successful (status code 200)
-        if response.status_code == 200:
-            print("POST request successful!")
-            resp = response.json()
+    print(f"Attempting to make reservation for {startTime} for {duration} minutes")
+    while len(court_choices) > 0:
+        try:
+            body_params = {
+                "duration": f"{str(duration)}",
+                "resourceId": court,
+                "service": None,
+                "start": startTime
+            }
+            response = requests.post(url, json=body_params, headers=headers)
+            if response.status_code == 200:
+                print("POST request successful!")
+                resp = response.json()
+                return resp['regId']
+            else:
+                print("POST request failed with status code:", response.status_code)
+                print("Response:", response.text)
+                court_choices.remove(court)
+                court = random.choice(court_choices) if len(court_choices) > 0 else None
 
-            print("Response:", resp)
-            return resp['regId']
-        else:
-            print("POST request failed with status code:", response.status_code)
-            print("Response:", response.text)
-    except Exception as e:
-        print("An error occurred:", str(e))
+        except Exception as e:
+            raise Exception("An error occurred while making an initial reservation", str(e))
 
+    raise Exception("All Courts were reserved")
 def confirmReservation(regId, headers):
     url = f"https://api.lifetimefitness.com/sys/registrations/V3/ux/resource/{regId}/complete"
 
@@ -86,17 +92,14 @@ def confirmReservation(regId, headers):
         "acceptedDocuments": [67]
     }
 
-    try:
-        response = requests.put(url, json=body_params, headers=headers)
+    response = requests.put(url, json=body_params, headers=headers)
 
-        if response.status_code == 200:
-            print("PUT request successful!")
+    if response.status_code == 200:
+        print("PUT request successful!")
+    else:
+        print("Response:", response.text)
+        raise Exception("PUT request failed with status code:", response.status_code)
 
-        else:
-            print("PUT request failed with status code:", response.status_code)
-            print("Response:", response.text)
-    except Exception as e:
-        print("An error occurred:", str(e))
 
 
 def getHeaders():
@@ -136,8 +139,9 @@ def handler(event=None, context=None):
     print(startTime)
     headers = getHeaders()
     regId = makeInitialReservation(startTime, headers, event.get('duration'),
-                                   courts.get(event.get('court'), random.choice(list(courts.values()))))
+                                   courts.get(event.get('court')))
     confirmReservation(regId, headers)
+    return True
 
 
 # if __name__ == '__main__':
