@@ -1,6 +1,8 @@
 import time, random
+import boto3
 import requests
 from datetime import datetime, timedelta, timezone
+from dotenv import load_dotenv
 import sys, os
 sys.path.append(os.getcwd())
 
@@ -44,7 +46,7 @@ def createDateTimeString(h, min, m, d):
         desiredDate = datetime.today() + timedelta(days=8)
         desiredDate = desiredDate.replace(hour=h, minute=min, second=0)
     else:
-        desiredDate = datetime(2024, m, d, h, min, 0)
+        desiredDate = datetime(datetime.now().year, m, d, h, min, 0)
     timezone_offset = timedelta(hours=-5)  # Assuming -05:00 offset
     tz = timezone(timezone_offset)
     dt_with_offset = desiredDate.replace(tzinfo=tz)
@@ -59,7 +61,6 @@ def makeInitialReservation(startTime, headers, duration, court):
 
     url = "https://api.lifetimefitness.com/sys/registrations/V3/ux/resource"
     court_choices = list(courts.values())
-
     print(f"Attempting to make reservation for {startTime} for {duration} minutes")
     while len(court_choices) > 0:
         try:
@@ -104,20 +105,36 @@ def confirmReservation(regId, headers):
 
 def getHeaders():
     driver.get("https://my.lifetime.life/login.html?resource=%2Fclubs%2Fmn%2Feden-prairie-athletic.html")
-    time.sleep(4)
+    time.sleep(5)
+    try:
+        # Wait for and click the OneTrust "Accept All" or "Reject All" button if it's present
+        consent_button = driver.find_element(By.ID, "onetrust-reject-all-handler")
+        consent_button.click()
+        print("Cookie consent dismissed.")
+        time.sleep(1)  # wait a moment for the banner to disappear
+    except:
+        print("No cookie consent banner detected.")
+
     usernameInput = driver.find_element(By.ID, 'account-username')
     passwordInput = driver.find_element(By.ID, 'account-password')
     submitButton = driver.find_element(By.ID, 'login-btn')
     usernameInput.send_keys("leibovich.shai@gmail.com")
-    password = os.environ['PASS']
+    password = os.getenv('PASS')
     if password is None:
         raise Exception("Password not provided!")
     passwordInput.send_keys(password)
-    submitButton.click()
-    print("Signing in!")
-    time.sleep(8)
+    try:
+        submitButton.click()
+        print("Signing in!")
+        time.sleep(3)
+    except Exception as e:
+        print("Error during submitButton.click():", e)
+        with open("/tmp/pageFile.html", "w") as f:
+            f.write(driver.page_source)
+        upload_to_s3('/tmp/pageFile.html' , 'lifetimedebug', "debug/lifetime_debug.html")
+        raise
     driver.get('https://my.lifetime.life/clubs/mn/eden-prairie-athletic/resource-booking.html')
-    time.sleep(12)
+    time.sleep(5)
     for request in driver.requests:
         if request.headers.__contains__('x-ltf-jwe') and request.headers.__contains__(
                 'x-ltf-ssoid') and request.headers.__contains__('x-ltf-profile') and request.headers.__contains__(
@@ -129,13 +146,23 @@ def getHeaders():
                 "x-ltf-ssoid": request.headers.get('x-ltf-ssoid'),
                 "x-ltf-jwe": request.headers.get('x-ltf-jwe'),
                 "ocp-apim-subscription-key": request.headers.get('ocp-apim-subscription-key'),
-                "Content-Type": "application/json"  # Specify content type as JSON
+                "Content-Type": "application/json",  # Specify content type as JSON
+                'User-Agent': 'PostmanRuntime/7.36.1',
+                'Accept': '*/*',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive'
             }
     raise Exception("No ocp-apim-subscription-key found")
 
+def upload_to_s3(file_path, bucket_name, key):
+    s3 = boto3.client('s3')
+    with open(file_path, "rb") as f:
+        s3.upload_fileobj(f, bucket_name, key)
+    print(f"Uploaded {file_path} to s3://{bucket_name}/{key}")
 
 def handler(event=None, context=None):
     startTime = createDateTimeString(event.get('hr'), event.get('min'), event.get('month'), event.get('day'))
+    load_dotenv(dotenv_path="./.envFile")
     print(startTime)
     headers = getHeaders()
     regId = makeInitialReservation(startTime, headers, event.get('duration'),
@@ -146,10 +173,11 @@ def handler(event=None, context=None):
 
 # if __name__ == '__main__':
 #     event = {
-#         'hr': 8,
+#         'hr': 20,
 #         'min': 30,
 #         'duration': 90,
-#         'month': 5,
-#         'day': 13
+#         'month': 6,
+#         'day': 27
 #     }
+#
 #     handler(event)

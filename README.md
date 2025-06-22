@@ -13,9 +13,9 @@ This image goes with these versions. [These are automatically updated and tested
 - selenium 4.20.0
 
 ## Running the demo
-
-docker buildx build --platform linux/amd64 -t 962145567907.dkr.ecr.us-east-2.amazonaws.com/lifetime:dynamic .
-docker push 962145567907.dkr.ecr.us-east-2.amazonaws.com/lifetime:dynamic 
+docker buildx build --platform linux/amd64 -t lifetime --load . &&                                              ✔  7s  .env  
+docker tag lifetime:latest 962145567907.dkr.ecr.us-east-2.amazonaws.com/lifetime:latest &&
+docker push 962145567907.dkr.ecr.us-east-2.amazonaws.com/lifetime:latest
 
 ```bash
 $ npm install -g serverless # skip this line if you have already installed Serverless Framework
